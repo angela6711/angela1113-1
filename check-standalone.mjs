@@ -1,0 +1,7 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+const html=fs.readFileSync('C:/Users/USER/Desktop/1113-1/想飛記帳本-手機版.html','utf8');const js=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const elements=new Map();const storage=new Map();let requests=0;
+const document={querySelector:selector=>{if(selector==='meta[name="ledger-mode"]')return{content:'local'};if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',classList:{add(){},remove(){}},addEventListener(){},close(){},showModal(){}});return elements.get(selector);},querySelectorAll:()=>[],addEventListener(){}};
+const context=vm.createContext({document,location:{protocol:'content:'},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},window:{scrollTo(){}},crypto,structuredClone,Date,Intl,Number,String,Math,JSON,setInterval(){},setTimeout(){},clearTimeout(){},fetch(){requests++;throw Error('Standalone unexpectedly requested server');}});
+vm.runInContext(js,context);await vm.runInContext('startOwn()',context);await vm.runInContext("mutate('saveTransaction',{type:'income',amount:6200000,category:'薪水',date:today,note:'離線功能測試',payment:'銀行轉帳'})",context);
+const saved=JSON.parse(storage.get('daily-ledger-mobile-v1'));assert.equal(saved.transactions[0].amount,6200000);assert.equal(requests,0);console.log('Standalone local mode: salary saved without server API; existing storage key preserved.');

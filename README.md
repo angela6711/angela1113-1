@@ -34,6 +34,15 @@ python3 -m http.server 4173 --bind 0.0.0.0 --directory dist
 
 本機自動化測試使用模擬 Google 服務，驗證匿名讀寫、版本衝突、完整快照寫入及離線重試；不能代替真實 Google 授權與跨來源網路測試。實際部署後請用兩台裝置確認資料來回存取。
 
+實際 Google 同步驗證（依 `cloud-config.json` 使用已部署的帳本）：
+
+```bash
+node scripts/verify-sync.mjs
+node scripts/verify-sync.mjs --write --site
+```
+
+第一個命令只讀取。第二個會寫入隨機的暫存中繼資料標記，讀回後移除，並檢查正式網站的連線設定。驗證不新增交易、不修改金額或預算；清理時重讀最新版本，保留其他裝置的變更。空白資料庫在寫入驗證時會初始化成空帳本。若網路在清理前中斷，程式會明確回報尚未清理的標記名稱，不會宣稱驗證成功。輸出只有版本、筆數與結果，不印出帳目內容。執行環境需允許 `script.google.com`、`script.googleusercontent.com`、`angela6711.github.io`。
+
 `index.html` 是 PWA 入口。中文手機 HTML 保留原離線版，供獨立下載及相容性檢查。原本 Windows 絕對路徑的 patch 腳本不是部署步驟。
 
 ## GitHub Pages

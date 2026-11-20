@@ -1,4 +1,4 @@
-/* Private Apps Script transport. No credentials are shipped with the app. */
+/* Public shared-ledger transport. The Google deployment permits anonymous read/write. */
 (function (root) {
   'use strict';
   class LedgerCloud {
@@ -8,15 +8,15 @@
       this.sequence = 0;
       this.status = 'disconnected';
       try { this.config = JSON.parse(storage.getItem('fly-ledger-cloud-v1') || 'null'); } catch { this.config = null; }
+      if (this.config?.key) { delete this.config.key; this.save(); }
     }
     save() { this.storage.setItem('fly-ledger-cloud-v1', JSON.stringify(this.config)); }
     emit(status, message = '') { this.status = status; this.message = message; this.notify(status, message); }
-    configure(url, key) {
+    configure(url) {
       if (this.running) throw Error('同步中，請稍後再變更連線');
       const parsed = new URL(url);
       if (parsed.origin !== 'https://script.google.com' || !/^\/macros\/s\/[\w-]+\/exec$/.test(parsed.pathname) || parsed.search || parsed.hash) throw Error('請填入 Apps Script 的 /exec 部署網址');
-      if (!/^[a-f0-9]{64}$/i.test(key)) throw Error('連線金鑰應為 64 位英數字，請從私人試算表複製');
-      this.config = { url: parsed.href, key, version: null, dirty: false };
+      this.config = { url: parsed.href, version: null, dirty: false };
       this.save();
     }
     disconnect() {
@@ -36,7 +36,7 @@
       const res = await this.request(this.config.url, {
         method: 'POST', redirect: 'follow', credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ...payload, action, key: this.config.key }),
+        body: JSON.stringify({ ...payload, action }),
         signal: AbortSignal.timeout(30000)
       });
       if (!res.ok) throw Error('Google 服務暫時無法使用（HTTP ' + res.status + '）');

@@ -1,6 +1,6 @@
-/** Deploy this file as a standalone Google Apps Script web app (execute as owner).
- * Run setup once while signed into the Google account that will own the private sheet.
- * Connection keys live only in that private sheet, Script Properties and the user's device.
+/** Public shared ledger: anonymous visitors may read and replace account data.
+ * Run setup once as the owner, then deploy as owner with access set to Anyone.
+ * The spreadsheet itself can stay private; all ledger data is public through this API.
  */
 function setup() {
   const props = PropertiesService.getScriptProperties();
@@ -10,41 +10,22 @@ function setup() {
     return existing.getUrl();
   }
   const book = SpreadsheetApp.create('想飛記帳本');
-  const key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
   const config = book.getSheets()[0];
   config.setName('連線設定');
   config.getRange(1, 1, 4, 2).setValues([
-    ['項目', '內容'], ['連線金鑰（請勿分享）', key],
-    ['使用方式', '部署 Apps Script 網頁應用程式後，在記帳 App 設定填入 /exec 網址與上方金鑰'],
-    ['注意', '試算表保持私人。請透過 App 編輯帳目；明細分頁是檢視用，直接改儲存格不會回寫 App。']
+    ['項目', '內容'], ['存取模式', '公開共用：任何訪客可讀寫帳本'],
+    ['使用方式', '部署為網頁應用程式，將 /exec 網址填入 GitHub 的 cloud-config.json'],
+    ['注意', '請透過 App 編輯帳目；明細分頁是檢視用，直接改儲存格不會回寫 App。']
   ]);
   for (const name of ['帳本資料', '交易明細', '固定支出', '月結報表']) book.insertSheet(name);
   book.getSheetByName('帳本資料').getRange(1, 1, 1, 3).setValues([[0, 0, '']]);
-  props.setProperties({ SPREADSHEET_ID: book.getId(), KEY_HASH: hashKey_(key) });
-  console.log(book.getUrl()); // Intentionally log only the private sheet URL, never the key.
+  props.setProperties({ SPREADSHEET_ID: book.getId() });
+  console.log(book.getUrl());
   return book.getUrl();
 }
 
-function hashKey_(key) {
-  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key, Utilities.Charset.UTF_8)
-    .map(b => ('0' + (b & 255).toString(16)).slice(-2)).join('');
-}
-
-function rotateConnectionKey() {
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('SPREADSHEET_ID');
-  if (!id) throw Error('請先執行 setup');
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const key = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
-    SpreadsheetApp.openById(id).getSheetByName('連線設定').getRange(2, 2, 1, 1).setValues([[key]]);
-    props.setProperty('KEY_HASH', hashKey_(key));
-  } finally { lock.releaseLock(); }
-}
-
 function doGet() {
-  return json_({ ok: false, code: 'POST_REQUIRED', error: '請透過記帳 App 連線；此網址不公開帳本資料。' });
+  return json_({ ok: true, public: true, message: '公開共用帳本。請以 POST pull 讀取、push 寫入。' });
 }
 
 function doPost(e) {
@@ -54,10 +35,6 @@ function doPost(e) {
     if (!raw || raw.length > 1500000) throw Error('請求大小無效');
     const input = JSON.parse(raw);
     const props = PropertiesService.getScriptProperties();
-    const expected = props.getProperty('KEY_HASH');
-    if (!expected || typeof input.key !== 'string' || input.key.length !== 64 || hashKey_(input.key) !== expected) {
-      return json_({ ok: false, code: 'UNAUTHORIZED', error: '連線金鑰不正確，請檢查私人試算表的「連線設定」分頁。' });
-    }
     if (!['pull', 'push'].includes(input.action)) throw Error('不支援的操作');
     lock = LockService.getScriptLock();
     if (!lock.tryLock(10000)) return json_({ ok: false, code: 'BUSY', error: '另一台裝置同步中，請稍後重試。' });

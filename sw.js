@@ -1,4 +1,4 @@
-const CACHE = 'fly-ledger-v2-20261120-2';
+const CACHE = 'fly-ledger-v2-20261120-3';
 const ASSETS = ['./', './index.html', './cloud-sync.js', './app-integration.js', './manifest.webmanifest', './setup.html', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png'];
 const allowed = new Set(ASSETS.map(path => new URL(path, self.registration.scope).href));
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));

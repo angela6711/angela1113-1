@@ -2,7 +2,7 @@
   "id": "./",
   "name": "想飛記帳本",
   "short_name": "想飛記帳",
-  "description": "離線記帳，連線後同步至私人 Google Sheets。",
+  "description": "公開共用記帳，離線儲存，連線後同步至同一份 Google Sheets。",
   "lang": "zh-Hant",
   "start_url": "./",
   "scope": "./",

@@ -8,7 +8,6 @@ const context = vm.createContext({ fetch, URL, AbortSignal, structuredClone });
 vm.runInContext(source, context);
 const { LedgerCloud } = context;
 const url = 'https://script.google.com/macros/s/test-deployment/exec';
-const key = 'a'.repeat(64);
 const state = note => ({ started: true, startMonth: '2026-11', budget: 3000000, transactions: note ? [{ id: 'one', note }] : [], recurring: [], settlements: [] });
 function fixture(local = state()) {
   const values = new Map();
@@ -20,7 +19,7 @@ function fixture(local = state()) {
     assert.equal(target, url);
     assert.equal(options.headers['Content-Type'], 'text/plain;charset=utf-8');
     assert.equal(options.credentials, 'omit');
-    const input = JSON.parse(options.body); calls.push(input);
+    const input = JSON.parse(options.body); assert.equal('key' in input, false); calls.push(input);
     if (hook) await hook(input);
     let result;
     if (input.action === 'pull') result = { ok: true, version, state: remote };
@@ -28,14 +27,13 @@ function fixture(local = state()) {
     else { remote = input.state; version++; result = { ok: true, version }; }
     return { ok: true, json: async () => structuredClone(result) };
   }});
-  cloud.configure(url, key);
+  cloud.configure(url);
   return { cloud, storage, calls, local: () => local, remote: () => remote, edit: next => { local = next; cloud.changed(); }, setRemote: next => { remote = next; version++; }, offline: value => { fail = value; }, hook: fn => { hook = fn; } };
 }
 
-test('rejects untrusted endpoints, preview URLs, query keys and short credentials', () => {
+test('rejects untrusted endpoints, preview URLs and query parameters', () => {
   const { cloud } = fixture();
-  for (const bad of ['http://script.google.com/macros/s/id/exec', 'https://evil.example/macros/s/id/exec', 'https://script.google.com/macros/s/id/dev', url + '?key=x']) assert.throws(() => cloud.configure(bad, key));
-  assert.throws(() => cloud.configure(url, 'short'));
+  for (const bad of ['http://script.google.com/macros/s/id/exec', 'https://evil.example/macros/s/id/exec', 'https://script.google.com/macros/s/id/dev', url + '?key=x']) assert.throws(() => cloud.configure(bad));
 });
 test('empty cloud receives the local ledger using a versioned commit', async () => {
   const f = fixture(state('saved'));
@@ -101,7 +99,7 @@ test('edits made during push remain dirty for a later sync', async () => {
   assert.equal(f.remote().transactions[0].note, 'before push');
   f.hook(null); await f.cloud.sync(); assert.equal(f.remote().transactions[0].note, 'during push');
 });
-test('disconnect removes credentials without deleting either ledger', async () => {
+test('disconnect removes connection settings without deleting either ledger', async () => {
   const f = fixture(state('keep')); await f.cloud.sync(); f.cloud.disconnect();
   assert.equal(f.storage.getItem('fly-ledger-cloud-v1'), null);
   assert.equal(f.remote().transactions[0].note, 'keep'); assert.equal(f.local().transactions[0].note, 'keep');

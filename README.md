@@ -1,21 +1,28 @@
-# 想飛記帳本 PWA + 私人 Google Sheets
+# 想飛記帳本：公開共用 PWA + Google Sheets
 
-既有記帳介面加入 PWA 安裝、離線快取、Google Sheets 雙向存取與跨裝置同步。公開網站只提供程式；個人資料留在私人試算表與裝置。此程式碼已提供串接，**必須完成 Google Apps Script 的真實部署才會有雲端資料庫**。
+任何訪客開啟同一個網站網址，都可查看、新增、修改、刪除同一份帳本；不需要登入或金鑰。離線先儲存在裝置，上線後同步。這是依擁有者選擇的**公開讀寫模式**。
 
-## 使用
+**程式碼已提供完整串接，但實際 Google 試算表必須由 Google 帳號擁有者授權並部署 Apps Script。`cloud-config.json` 的 `url` 尚未填入時，只能本機記帳，不能跨裝置同步。**
 
-1. 依 [建表與部署步驟](setup.html) 在自己的 Google 帳號部署 [Code.gs](google-apps-script/Code.gs) 與 [資訊清單](google-apps-script/appsscript.json)。執行 `setup` 建立新的私人「想飛記帳本」。
-2. 在 App 設定填入 `/exec` 網址及試算表「連線設定」B2 金鑰。空白雲端首次同步會存入本機帳本；既有雲端資料不會在未選擇版本時被覆蓋。
-3. 複製「跨裝置私人連線網址」給自己的手機、電腦。連線資訊透過 URL fragment 傳入，不會寫進 GitHub，也不會傳給靜態網站伺服器；開啟後立即移除 fragment，保存在該裝置。誰持有網址，誰就可以讀寫帳本，請私下保存。
-4. 新增一筆收支，確認「已同步 Google Sheets」並在另一台裝置讀取。前景約每 30 秒檢查雲端；離線先保留本機，回到 App 後重試。這不是持續推播或保證的背景同步。
+## 讓同一個網址連到同一份資料
 
-試算表含連線設定、帳本資料、交易明細、固定支出、月結報表。「帳本資料」是來源，其餘帳目分頁是方便閱讀的投影；直接改投影儲存格不會修改 App。金額來源以整數分儲存，明細以元顯示。單一帳本上限為 JSON 100 萬字元及每類 10,000 筆；接近配額時請下載備份。
+1. 依 [Google 建表與部署步驟](setup.html)，將 [Code.gs](google-apps-script/Code.gs) 及 [資訊清單](google-apps-script/appsscript.json) 放進自己的 Google Apps Script 專案。
+2. 執行 `setup`，授權建立新的「想飛記帳本」Google 試算表。
+3. 部署為網頁應用程式：以「我」執行、允許「任何人」存取。取得 `/exec` 網址。
+4. 將 `/exec` 網址填入 [cloud-config.json](cloud-config.json) 的 `url`，提交並重新發布網站。這是公開的連線設定，不需 Google 密碼或秘密金鑰。
+5. 每位訪客開啟相同網站網址即會自動連線。設定頁也可手動輸入部署網址，或複製含連線參數的共用網址供部署測試；正式使用以 `cloud-config.json` 統一設定為準。
 
-多裝置同時修改以版本檢查與 Apps Script 鎖阻擋覆寫，保留本機並要求明確選擇。這個人版不自動合併兩份帳本。同步寫入成功但回應遺失時，也可能提示版本衝突；先備份再選擇。
+在一台裝置新增收支，確認「已同步 Google Sheets」，再用另一台開啟同一個網址驗證。前景約每 30 秒檢查雲端，本機修改後約 1 秒啟動同步，也可手動「立即同步」。不是持續推播，也不保證關閉 App 後背景同步。
 
-## 開發與檢查
+## 資料與衝突
 
-不需安裝套件。使用 Node.js 24、Python 3：
+試算表含連線設定、帳本資料、交易明細、固定支出、月結報表。「帳本資料」是來源；明細是方便閱讀的投影，直接改投影儲存格不會修改 App。金額以整數分保存，明細以元顯示。單一帳本上限 JSON 100 萬字元、每類 10,000 筆。
+
+多裝置同時修改，以版本檢查與 Apps Script 鎖阻擋覆寫。App 會保留本機資料，要求明確選擇保留本機或雲端；請先下載 JSON 備份。此版不自動合併兩份帳本。公開訪客都可讀寫，沒有使用者隔離；試算表檔案本身可保持限制分享，公開的是網站 API。
+
+## 開發與測試
+
+無套件依賴，使用 Node.js 24、Python 3：
 
 ```bash
 node --test tests/*.test.mjs
@@ -23,22 +30,20 @@ node scripts/build-site.mjs
 python3 -m http.server 4173 --bind 0.0.0.0 --directory dist
 ```
 
-開發伺服器只提供靜態檔；實際 Google 存取需要已部署的 Apps Script。本機測試使用模擬 Google 服務驗證驗證金鑰、版本衝突、狀態完整寫入與離線重試，不能代替真實 Google 授權及跨來源網路測試。
+若機器提供 Chromium，可另執行 `node tests/browser-smoke.mjs`，檢查真正瀏覽器的離線重開、記帳、公開連線網址，以及模擬 Sheets 存取。
 
-`index.html` 是新版入口。中文手機 HTML 保留原離線版，作為獨立下載與相容性檢查。原先 Windows 絕對路徑的測試與 patch 腳本未作為部署步驟使用。
+本機自動化測試使用模擬 Google 服務，驗證匿名讀寫、版本衝突、完整快照寫入及離線重試；不能代替真實 Google 授權與跨來源網路測試。實際部署後請用兩台裝置確認資料來回存取。
 
-## 上傳與 GitHub Pages
+`index.html` 是 PWA 入口。中文手機 HTML 保留原離線版，供獨立下載及相容性檢查。原本 Windows 絕對路徑的 patch 腳本不是部署步驟。
 
-`.github/workflows/pages.yml` 會測試、建立白名單網站目錄，再部署 GitHub Pages。第一次需在 GitHub repository → Settings → Pages → Build and deployment → Source 選擇 **GitHub Actions**，再執行工作流程。預期網站路徑為 `https://angela6711.github.io/angela1113-1/`；是否已上線要以 Actions／Pages 的成功結果為準。
+## GitHub Pages
 
-部署只包含網站與公開後端程式範本，不包含儲存庫內的 Excel、舊部署壓縮檔或裝置連線設定。原先已追蹤的 Excel 和壓縮檔仍在 Git 儲存庫，並未刪除；不要把私人帳本匯出檔 commit 到公開儲存庫。
+[工作流程](.github/workflows/pages.yml) 會測試、建立網站目錄、部署 Pages。第一次需到 GitHub repository → Settings → Pages → Source 選擇 **GitHub Actions**，再執行「Test and publish PWA」。預期網站路徑為 `https://angela6711.github.io/angela1113-1/`；是否已上線須以 Pages 與 Actions 成功結果確認。
 
-更新靜態檔時請同步更改 `sw.js` 的 CACHE 版本；設定頁可套用等待中的版本。快取僅處理本站白名單靜態檔，不快取 Google API、POST 或金鑰。Apps Script 程式更新後，須在「管理部署作業」選擇新版本，維持原 `/exec` 部署網址。
+部署目錄只包含網站與公開 Apps Script 範本，不包含儲存庫內的 Excel、舊部署壓縮檔或裝置資料。原先已追蹤的 Excel 和壓縮檔仍在 Git 儲存庫，未予刪除。
 
-## 存取與限制
+更新快取檔時同步更改 `sw.js` 的 CACHE 版本。設定頁可套用等待中的更新；同步 API 與 `cloud-config.json` 不進靜態快取。Apps Script 更新後須到「管理部署作業」選擇新版本，保持原 `/exec` 網址。
 
-- Google 試算表保持私人，後端以擁有者身分執行，入口以隨機 64 位十六進位金鑰保護。金鑰只放私人試算表、雜湊指令碼屬性及你自己的裝置；透過 HTTPS POST 傳送。
-- 請避免在共用或不可信裝置設定。此個人版使用瀏覽器 localStorage 保存連線金鑰與離線帳目，並非裝置端加密保險箱。第三方 JavaScript 不會載入主程式。
-- Google Apps Script 有執行與試算表配額，Workspace 管理員也可能禁止「任何人」的 web app 部署。這些限制需要 Google 帳號擁有者處理。
-- 使用者首次執行自己建立的 Apps Script 可能出現未驗證應用提示；確認程式內容與擁有者後再授權。無須提供 Google 密碼給本專案。
-- 即時匯率功能另外依賴 ExchangeRate-API 的網路可用性，不影響記帳與 Sheets 同步。
+## Google 需求
+
+Google 帳號需有 Apps Script 與試算表權限。Workspace 管理員可能禁止匿名 web app 存取，需由管理員允許。Google Apps Script 有執行與試算表配額；這是輕量共用帳本，不保證大量匿名訪客的服務容量。即時匯率另外依賴 ExchangeRate-API，不影響帳目存取。

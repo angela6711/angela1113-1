@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import assert from 'node:assert/strict';
 const profile = await mkdtemp(join(tmpdir(), 'fly-ledger-browser-'));
 const originalConfig = await readFile('dist/cloud-config.json');
+// Keep browser smoke tests isolated from the real shared ledger.
+await writeFile('dist/cloud-config.json', JSON.stringify({ ...JSON.parse(originalConfig), url: '' }));
 const server = spawn('python3', ['-m', 'http.server', '4173', '--bind', '127.0.0.1', '--directory', 'dist'], { stdio: 'ignore' });
 const browser = spawn('chromium', ['--headless', '--no-sandbox', '--disable-dev-shm-usage', '--no-proxy-server', '--remote-debugging-port=9327', '--user-data-dir=' + profile, 'http://127.0.0.1:4173/'], { stdio: 'ignore' });
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));

@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import vm from 'node:vm';
+
+function fixture() {
+  const properties = new Map(), sheets = new Map();
+  let held = false, busy = false, count = 0;
+  class Sheet {
+    constructor(name) { this.name = name; this.data = []; this.cols = 26; this.rows = 1000; sheets.set(name, this); }
+    setName(name) { sheets.delete(this.name); this.name = name; sheets.set(name, this); }
+    getRange(row, col, rows, cols) {
+      return { setValues: values => { assert.equal(values.length, rows); for (let r = 0; r < rows; r++) { assert.equal(values[r].length, cols); this.data[row + r - 1] ||= []; for (let c = 0; c < cols; c++) { const value = values[r][c]; this.data[row + r - 1][col + c - 1] = typeof value === 'string' && value.startsWith("'") ? value.slice(1) : value; } } }, getValues: () => Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => this.data[row + r - 1]?.[col + c - 1] ?? '')) };
+    }
+    getLastColumn() { return Math.max(1, ...this.data.map(row => row.length)); }
+    getMaxColumns() { return this.cols; }
+    insertColumnsAfter(_, count) { this.cols += count; }
+    getMaxRows() { return this.rows; }
+    insertRowsAfter(_, count) { this.rows += count; }
+    clearContents() { this.data = []; }
+    setFrozenRows() {}
+  }
+  new Sheet('Sheet1');
+  const book = { getSheets: () => [...sheets.values()], insertSheet: name => new Sheet(name), getSheetByName: name => sheets.get(name), getId: () => 'private-id', getUrl: () => 'https://docs.google.com/spreadsheets/d/private-id/edit' };
+  const props = { getProperty: key => properties.get(key), setProperty: (key, value) => properties.set(key, value), setProperties: obj => Object.entries(obj).forEach(([k, v]) => properties.set(k, v)) };
+  const lock = { tryLock: () => { if (busy) return false; held = true; return true; }, waitLock: () => { held = true; }, hasLock: () => held, releaseLock: () => { held = false; } };
+  const context = vm.createContext({ console: { log() {} }, PropertiesService: { getScriptProperties: () => props }, SpreadsheetApp: { create: () => { count++; return book; }, openById: id => { assert.equal(id, 'private-id'); return book; }, flush() {} }, Utilities: { getUuid: randomUUID, computeDigest: (_, value) => [...createHash('sha256').update(value).digest()], DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' } }, LockService: { getScriptLock: () => lock }, ContentService: { MimeType: { JSON: 'json' }, createTextOutput: text => ({ text, setMimeType() { return this; } }) } });
+  vm.runInContext(readFileSync(new URL('../google-apps-script/Code.gs', import.meta.url), 'utf8'), context);
+  context.setup();
+  const key = sheets.get('連線設定').data[1][1];
+  return { context, sheets, key, call: input => JSON.parse(context.doPost({ postData: { contents: JSON.stringify({ key, ...input }) } }).text), held: () => held, busy: () => { busy = true; }, creations: () => count };
+}
+const empty = () => ({ started: true, startMonth: '2026-11', budget: 3000000, transactions: [], recurring: [], settlements: [] });
+const transaction = note => ({ id: 'tx-1', type: 'expense', amount: 12345, category: '餐飲', payment: '現金', date: '2026-11-20', note });
+test('setup creates one private sheet and can safely run again', () => { const f = fixture(); f.context.setup(); assert.equal(f.creations(), 1); assert.match(f.key, /^[a-f0-9]{64}$/); assert.equal(f.sheets.size, 5); });
+test('GET and invalid credentials never expose ledger data', () => { const f = fixture(); assert.equal(f.call({ key: 'b'.repeat(64), action: 'pull' }).code, 'UNAUTHORIZED'); assert.equal(JSON.parse(f.context.doGet().text).code, 'POST_REQUIRED'); });
+test('push stores a complete versioned snapshot and readable currency projection', () => { const f = fixture(), state = empty(); state.transactions.push(transaction('lunch')); assert.equal(f.call({ action: 'push', expectedVersion: 0, state }).version, 1); assert.deepEqual(f.call({ action: 'pull' }).state, state); assert.equal(f.sheets.get('交易明細').data[1][5], 123.45); assert.equal(f.held(), false); });
+test('stale versions cannot overwrite committed data', () => { const f = fixture(); f.call({ action: 'push', expectedVersion: 0, state: empty() }); assert.equal(f.call({ action: 'push', expectedVersion: 0, state: { ...empty(), budget: 1 } }).code, 'CONFLICT'); assert.equal(f.call({ action: 'pull' }).state.budget, 3000000); });
+test('busy lock refuses access instead of permitting concurrent writes', () => { const f = fixture(); f.busy(); assert.equal(f.call({ action: 'pull' }).code, 'BUSY'); });
+test('large ledgers round-trip through multiple safe spreadsheet cells', () => { const f = fixture(), state = empty(); f.sheets.get('帳本資料').cols = 3; state.transactions = Array.from({ length: 1200 }, (_, i) => ({ ...transaction('測試資料'.repeat(20)), id: 'tx-' + i })); assert.equal(f.call({ action: 'push', expectedVersion: 0, state }).ok, true); assert(f.sheets.get('帳本資料').cols > 3); assert.deepEqual(f.call({ action: 'pull' }).state, state); });
+test('formula-like labels are escaped in spreadsheet projections', () => { const f = fixture(), state = empty(); state.transactions.push(transaction('=IMPORTXML("https://example.invalid", "a")')); assert.equal(f.call({ action: 'push', expectedVersion: 0, state }).ok, true); assert.equal(f.context.safeCell_('=1+1'), "'=1+1"); assert.equal(f.context.safeCell_('+1'), "'+1"); });
+test('invalid amounts, dates, duplicate IDs and malicious IDs are rejected without changing version', () => { for (const mutate of [s => s.transactions[0].amount = NaN, s => s.transactions[0].date = '2026-02-31', s => s.transactions.push({ ...s.transactions[0] }), s => s.transactions[0].id = "');alert(1)//"]) { const f = fixture(), state = empty(); state.transactions.push(transaction('x')); mutate(state); assert.equal(f.call({ action: 'push', expectedVersion: 0, state }).ok, false); assert.equal(f.call({ action: 'pull' }).version, 0); assert.equal(f.held(), false); } });
+test('rotating credentials revokes the original key', () => { const f = fixture(); f.context.rotateConnectionKey(); assert.equal(f.call({ action: 'pull' }).code, 'UNAUTHORIZED'); const key = f.sheets.get('連線設定').data[1][1]; assert.equal(f.call({ key, action: 'pull' }).ok, true); });

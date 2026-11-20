@@ -1,0 +1,8 @@
+dist/
+.env
+.env.*
+!.env.example
+node_modules/
+.clasp.json
+.clasprc.json
+test-results/

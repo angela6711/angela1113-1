@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>建立私人 Google Sheets 帳本</title><style>body{font:16px/1.8 system-ui,sans-serif;background:#f6f7f2;color:#203d36;max-width:760px;margin:auto;padding:24px}h1{font-size:26px}li{margin:18px 0}a{color:#2d6a52}code{background:#e8ece5;padding:3px 6px}aside{background:#eaf0e6;padding:16px;border-radius:12px}button{font:inherit;padding:8px 14px}</style></head><body>
+<a href="./">← 返回記帳本</a><h1>建立你的私人 Google Sheets 帳本</h1>
+<p>只需由帳本擁有者設定一次。完成後，其他手機或電腦使用同一個「私人連線網址」即可同步。</p>
+<ol>
+<li>登入你的 Google 帳號，開啟 <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer">Google Apps Script</a>，建立「新專案」，命名為「想飛記帳本」。</li>
+<li>將 <a href="./google-apps-script/Code.gs" target="_blank" rel="noopener">Code.gs 程式</a> 的完整內容複製到編輯器的 <code>Code.gs</code>，取代預設內容並儲存。專案設定 → 勾選「在編輯器中顯示 appsscript.json 資訊清單檔案」，將 <a href="./google-apps-script/appsscript.json" target="_blank" rel="noopener">appsscript.json</a> 完整內容貼上並儲存。</li>
+<li>在函式下拉選單選擇 <code>setup</code>，按「執行」，依 Google 畫面授權讀寫試算表。若 Google 顯示此自建應用尚未驗證，請先確認這就是你剛建立、包含本專案程式的應用，再依畫面繼續。此步驟會建立新的私人「想飛記帳本」試算表。重複執行不會再建立第二份。</li>
+<li>執行記錄會顯示新試算表的連結。開啟它，在「連線設定」分頁複製 B2 的 64 位連線金鑰。試算表的分享權限保持「限制」。不要把金鑰貼到 GitHub 或聊天室。</li>
+<li>Apps Script →「部署」→「新增部署作業」→ 類型選「網頁應用程式」→「執行身分」選「我」→「誰可以存取」選「任何人」→ 部署。複製結尾為 <code>/exec</code> 的網頁應用程式網址。讀寫另受私人金鑰保護，不會因這個選項公開試算表。若 Workspace 管理員禁止此部署選項，須先由管理員允許，無法以本程式繞過。</li>
+<li>返回記帳本 → 右上角設定 → 填入部署網址與金鑰 →「連線私人試算表」。空白雲端帳本會接收現有本機資料；若兩邊都有帳目，請先備份並選擇保留版本。</li>
+<li>確認顯示「已同步 Google Sheets」，到試算表「交易明細」確認資料。新增一筆測試收支，等同步完成，再以另一台裝置測試讀取及修改。請透過 App 修改帳目；明細分頁是檢視用，直接修改儲存格不會回寫。</li>
+<li>設定 →「複製跨裝置私人連線網址」，私下傳給自己的其他裝置。開啟後會移除網址列中的金鑰並保存在該裝置。金鑰仍可能留在你使用的訊息或瀏覽紀錄中，請只透過你信任的私人管道傳送。連線期間，前景畫面約每 30 秒檢查其他裝置的更新；本機修改後約 1 秒啟動同步，也可以按「立即同步」。</li>
+</ol>
+<aside>離線記帳會先保存在瀏覽器，關閉 App 後不保證背景同步；下次開啟會重試。不同裝置同時修改會先停止同步並提示選擇，請先備份再處理衝突。清除瀏覽器資料或遺失裝置前，務必確認雲端同步完成並下載 JSON 備份。擁有私人連線網址的人可讀寫此帳本。若網址外流，在 Apps Script 執行 <code>rotateConnectionKey</code>，再從試算表 B2 複製新金鑰。原金鑰即失效，所有裝置都需重新連線。</aside>
+<p>iPhone 使用 Safari「分享 → 加入主畫面」；Android／電腦使用瀏覽器的「安裝應用程式」。須透過 HTTPS 或本機開發伺服器開啟；直接點開 HTML 檔案不支援 PWA。</p>
+</body></html>

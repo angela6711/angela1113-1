@@ -31,6 +31,7 @@
     const busy = cloud.running ? 'disabled' : '';
     return `<section class="card cloud-card"><div class="section-head"><h2>Google Sheets 公開共用帳本</h2><span class="tiny-tag" id="cloud-status" role="status">${esc(labels[cloud.status])}</span></div>
       <p class="subtext">任何訪客都可查看、新增、修改及刪除這份共用帳本。離線先儲存在裝置，連線後同步。</p>
+      ${siteSpreadsheetId ? `<p class="save-message">帳目目的地：<a href="https://docs.google.com/spreadsheets/d/${esc(siteSpreadsheetId)}/edit" target="_blank" rel="noopener noreferrer">開啟指定 Google 試算表 ↗</a>（需完成部署後才會同步）</p>` : ''}
       ${cloud.message ? `<p class="form-error" role="alert">${esc(cloud.message)}</p>` : ''}
       ${configured ? `<p class="save-message">${cloud.config.lastSync ? '上次同步：' + esc(new Date(cloud.config.lastSync).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })) : '尚未完成首次同步'}</p>
         <button class="primary wide" onclick="syncLedger()" ${busy}>${icon('cloud')}立即同步</button>
@@ -105,14 +106,17 @@
   window.addEventListener('hashchange', () => { connectFromUrl(); schedule(); });
   connectFromUrl();
   let siteEndpoint = '';
+  let siteSpreadsheetId = '';
   // A published endpoint connects every visitor using the ordinary site URL.
   fetch('./cloud-config.json', { cache: 'no-store' }).then(response => {
     if (!response.ok) throw Error('未讀取網站連線設定');
     return response.json();
   }).then(config => {
+    if (typeof config.spreadsheetId === 'string' && /^[A-Za-z0-9_-]+$/.test(config.spreadsheetId)) siteSpreadsheetId = config.spreadsheetId;
     if (typeof config.url === 'string' && config.url) {
       siteEndpoint = config.url;
       if (!cloud.config || cloud.config.url !== siteEndpoint) cloud.configure(siteEndpoint);
     }
+    if (tab === 'settings') render();
   }).catch(() => {}).finally(schedule);
 })();

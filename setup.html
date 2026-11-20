@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>建立公開共用 Google Sheets 帳本</title><style>body{font:16px/1.8 system-ui,sans-serif;background:#f6f7f2;color:#203d36;max-width:760px;margin:auto;padding:24px}h1{font-size:26px}li{margin:18px 0}a{color:#2d6a52}code{background:#e8ece5;padding:3px 6px}aside{background:#eaf0e6;padding:16px;border-radius:12px}</style></head><body>
-<a href="./">← 返回記帳本</a><h1>建立公開共用 Google Sheets 帳本</h1>
+<html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>連接指定 Google Sheets 帳本</title><style>body{font:16px/1.8 system-ui,sans-serif;background:#f6f7f2;color:#203d36;max-width:760px;margin:auto;padding:24px}h1{font-size:26px}li{margin:18px 0}a{color:#2d6a52}code{background:#e8ece5;padding:3px 6px}aside{background:#eaf0e6;padding:16px;border-radius:12px}</style></head><body>
+<a href="./">← 返回記帳本</a><h1>連接指定 Google Sheets 帳本</h1>
 <p>依擁有者選擇，這是公開共用模式：任何訪客都能查看、新增、修改與刪除帳目。網站不要求登入或金鑰。</p>
 <ol>
-<li>帳本擁有者登入 Google，開啟 <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer">Google Apps Script</a>，建立「新專案」，命名為「想飛記帳本」。</li>
+<li>用能編輯試算表的 Google 帳號開啟 <a href="https://docs.google.com/spreadsheets/d/17BTKjJJPznABLK0su4HlHf5UkvCicoeFbK7aFf-tu6s/edit" target="_blank" rel="noopener noreferrer">指定的 Google 試算表</a>，選擇「擴充功能 → Apps Script」，專案命名為「想飛記帳本」。</li>
 <li>將 <a href="./google-apps-script/Code.gs" target="_blank" rel="noopener">Code.gs 完整程式</a> 複製到編輯器的 <code>Code.gs</code>，取代預設內容並儲存。專案設定 → 勾選「在編輯器中顯示 appsscript.json 資訊清單檔案」，將 <a href="./google-apps-script/appsscript.json" target="_blank" rel="noopener">appsscript.json</a> 完整內容貼上並儲存。</li>
-<li>函式選擇 <code>setup</code>，按「執行」，依 Google 畫面授權讀寫試算表。若出現自建應用未驗證提示，請先確認程式內容與擁有者，再依畫面繼續。此步驟會建立新的「想飛記帳本」試算表；執行記錄會顯示連結。重複執行不會再建第二份。</li>
+<li>函式選擇 <code>setup</code>，按「執行」，依 Google 畫面授權讀寫試算表。若出現自建應用未驗證提示，請先確認程式內容與擁有者，再依畫面繼續。此步驟會在指定試算表新增五個「想飛_」分頁，保留原本的分頁與儲存格，不另外建立試算表。執行記錄會顯示指定試算表連結。重複執行不會清空帳目；如已有同名分頁而不是此專案建立，會停止以免覆寫。</li>
 <li>「部署」→「新增部署作業」→ 類型「網頁應用程式」→「執行身分」選「我」→「誰可以存取」選「任何人」→ 部署。複製結尾為 <code>/exec</code> 的網址。若 Workspace 管理員禁止此選項，須先請管理員允許。</li>
 <li>在 GitHub 儲存庫的 <code>cloud-config.json</code>，把 <code>url</code> 的空字串改成上一步的完整 <code>/exec</code> 網址並提交。這個網址是公開的，不是密碼。網站發布後，每位訪客開啟同一個網站網址，就會自動連到同一份帳本。若由開發者代填，只需提供部署網址，不需提供 Google 密碼。</li>
 <li>GitHub → Settings → Pages → Source 選擇 <strong>GitHub Actions</strong>，再從 Actions 執行「Test and publish PWA」。等待成功後開啟 Pages 提供的網址。請以工作流程結果確認網址已上線。</li>
-<li>在 App 新增一筆測試收支，確認「已同步 Google Sheets」，並到試算表「交易明細」確認。用另一台手機開啟相同網站網址，確認能查看並修改同一筆資料。</li>
+<li>在 App 新增一筆測試收支，確認「已同步 Google Sheets」，並到試算表「想飛_交易明細」確認。用另一台手機開啟相同網站網址，確認能查看並修改同一筆資料。</li>
 </ol>
 <aside>前景約每 30 秒檢查其他裝置更新，本機修改後約 1 秒啟動同步；可以按「立即同步」。離線先存在裝置，關閉 App 後不保證背景同步，下次開啟會重試。兩台裝置同時修改會提示版本衝突，請先下載 JSON 備份，再選擇保留本機或雲端。Google 帳本資料經公開 API 開放讀寫，沒有使用者隔離或登入權限。</aside>
-<p>試算表包含「帳本資料」「交易明細」「固定支出」「月結報表」。請透過 App 修改帳目；明細分頁是檢視用，直接改儲存格不會回寫 App。試算表檔案本身可保持限制分享，不影響所有訪客透過網站讀寫。</p>
+<p>App 管理的分頁是「想飛_連線設定」「想飛_帳本資料」「想飛_交易明細」「想飛_固定支出」「想飛_月結報表」，原有其他分頁不會修改。請透過 App 修改帳目；明細分頁是檢視用，直接改儲存格不會回寫 App。試算表檔案本身可保持限制分享，不影響所有訪客透過網站讀寫。</p>
 <p>iPhone：Safari 分享 → 加入主畫面。Android／電腦：瀏覽器「安裝應用程式」。須使用 HTTPS 或本機開發伺服器；直接點開 HTML 不支援 PWA。第一次開啟需要網路。</p>
 </body></html>

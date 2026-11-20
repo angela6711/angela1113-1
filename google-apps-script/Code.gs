@@ -1,27 +1,40 @@
 /** Public shared ledger: anonymous visitors may read and replace account data.
- * Run setup once as the owner, then deploy as owner with access set to Anyone.
+ * Run setup once with edit access to the selected spreadsheet, then deploy as owner with access set to Anyone.
  * The spreadsheet itself can stay private; all ledger data is public through this API.
  */
+const TARGET_SPREADSHEET_ID = '17BTKjJJPznABLK0su4HlHf5UkvCicoeFbK7aFf-tu6s';
+const LEDGER_SCHEMA = 'fly-ledger-selected-sheet-v1';
+const LEDGER_TABS = ['想飛_連線設定', '想飛_帳本資料', '想飛_交易明細', '想飛_固定支出', '想飛_月結報表'];
+
 function setup() {
-  const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SPREADSHEET_ID')) {
-    const existing = SpreadsheetApp.openById(props.getProperty('SPREADSHEET_ID'));
-    console.log(existing.getUrl());
-    return existing.getUrl();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    // Open exactly the user-selected file. Never create a replacement spreadsheet.
+    const book = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+    if (props.getProperty('SPREADSHEET_ID') === TARGET_SPREADSHEET_ID && props.getProperty('LEDGER_SCHEMA') === LEDGER_SCHEMA) {
+      for (const name of LEDGER_TABS) if (!book.getSheetByName(name)) throw Error('帳本分頁遺失；請先從備份還原，不會自動清空或重建。');
+      console.log(book.getUrl());
+      return book.getUrl();
+    }
+    // Refuse a collision before writing anything to an existing user's tab.
+    for (const name of LEDGER_TABS) if (book.getSheetByName(name)) throw Error('已有同名分頁 ' + name + '，為保留資料已停止設定。');
+    for (const name of LEDGER_TABS) book.insertSheet(name);
+    const config = book.getSheetByName('想飛_連線設定');
+    config.getRange(1, 1, 4, 2).setValues([
+      ['項目', '內容'], ['存取模式', '公開共用：任何訪客可讀寫帳本'],
+      ['使用方式', '部署為網頁應用程式，將 /exec 網址填入 GitHub 的 cloud-config.json'],
+      ['注意', '請透過 App 編輯帳目；想飛_分頁由 App 管理，原有其他分頁不會修改。']
+    ]);
+    book.getSheetByName('想飛_帳本資料').getRange(1, 1, 1, 3).setValues([[0, 0, '']]);
+    SpreadsheetApp.flush();
+    props.setProperties({ SPREADSHEET_ID: TARGET_SPREADSHEET_ID, LEDGER_SCHEMA: LEDGER_SCHEMA });
+    console.log(book.getUrl());
+    return book.getUrl();
+  } finally {
+    lock.releaseLock();
   }
-  const book = SpreadsheetApp.create('想飛記帳本');
-  const config = book.getSheets()[0];
-  config.setName('連線設定');
-  config.getRange(1, 1, 4, 2).setValues([
-    ['項目', '內容'], ['存取模式', '公開共用：任何訪客可讀寫帳本'],
-    ['使用方式', '部署為網頁應用程式，將 /exec 網址填入 GitHub 的 cloud-config.json'],
-    ['注意', '請透過 App 編輯帳目；明細分頁是檢視用，直接改儲存格不會回寫 App。']
-  ]);
-  for (const name of ['帳本資料', '交易明細', '固定支出', '月結報表']) book.insertSheet(name);
-  book.getSheetByName('帳本資料').getRange(1, 1, 1, 3).setValues([[0, 0, '']]);
-  props.setProperties({ SPREADSHEET_ID: book.getId() });
-  console.log(book.getUrl());
-  return book.getUrl();
 }
 
 function doGet() {
@@ -38,8 +51,9 @@ function doPost(e) {
     if (!['pull', 'push'].includes(input.action)) throw Error('不支援的操作');
     lock = LockService.getScriptLock();
     if (!lock.tryLock(10000)) return json_({ ok: false, code: 'BUSY', error: '另一台裝置同步中，請稍後重試。' });
-    const book = SpreadsheetApp.openById(props.getProperty('SPREADSHEET_ID'));
-    const sheet = book.getSheetByName('帳本資料');
+    if (props.getProperty('SPREADSHEET_ID') !== TARGET_SPREADSHEET_ID || props.getProperty('LEDGER_SCHEMA') !== LEDGER_SCHEMA) throw Error('請先對指定試算表執行 setup');
+    const book = SpreadsheetApp.openById(TARGET_SPREADSHEET_ID);
+    const sheet = book.getSheetByName('想飛_帳本資料');
     const cells = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const version = Number(cells[0]) || 0;
     const count = Number(cells[1]) || 0;
@@ -121,11 +135,11 @@ function writeView_(book, name, headers, rows) {
 }
 
 function updateViews_(book, state) {
-  writeView_(book, '交易明細', ['ID', '日期', '收支', '分類', '名稱', '新台幣金額', '付款方式'],
+  writeView_(book, '想飛_交易明細', ['ID', '日期', '收支', '分類', '名稱', '新台幣金額', '付款方式'],
     state.transactions.map(t => [t.id, t.date, t.type === 'income' ? '進帳' : '出帳', t.category, t.note, t.amount / 100, t.payment]));
-  writeView_(book, '固定支出', ['ID', '名稱', '新台幣金額', '分類', '付款方式', '每月扣款日', '下次月份', '啟用'],
+  writeView_(book, '想飛_固定支出', ['ID', '名稱', '新台幣金額', '分類', '付款方式', '每月扣款日', '下次月份', '啟用'],
     state.recurring.map(r => [r.id, r.name, r.amount / 100, r.category, r.payment, r.day, r.nextMonth, r.active]));
-  writeView_(book, '月結報表', ['月份', '收入', '支出', '期初', '期末', '筆數', '結帳時間'],
+  writeView_(book, '想飛_月結報表', ['月份', '收入', '支出', '期初', '期末', '筆數', '結帳時間'],
     state.settlements.map(s => [s.month, s.income / 100, s.expense / 100, s.opening / 100, s.closing / 100, s.count, s.closedAt]));
 }
 

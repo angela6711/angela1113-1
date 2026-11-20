@@ -27,6 +27,7 @@ try {
   assert.equal(await evaluate("document.body.textContent.includes('示範帳本')"), true);
   await evaluate("navigate('settings')");
   assert.equal(await evaluate("Boolean(document.querySelector('#cloud-url')) && !document.querySelector('#cloud-key')"), true);
+  await waitFor("Boolean(document.querySelector('a[href=\"https://docs.google.com/spreadsheets/d/17BTKjJJPznABLK0su4HlHf5UkvCicoeFbK7aFf-tu6s/edit\"]'))");
   await evaluate("startOwn()");
   const saved = await evaluate("(async()=>{const ok=await mutate('saveTransaction',{type:'expense',amount:14900,category:'餐飲',date:today,note:'瀏覽器離線測試',payment:'現金'});render();return ok})()");
   assert.equal(saved, true);
@@ -52,7 +53,7 @@ try {
   assert.equal(await evaluate("document.body.textContent.includes('瀏覽器離線測試')"), true);
   await evaluate("mutate('saveTransaction',{type:'income',amount:6200000,category:'薪水',date:today,note:'離線薪水',payment:'銀行轉帳'})");
   assert.equal(await evaluate('JSON.parse(localStorage.getItem(LOCAL_KEY)).transactions.length'), 2);
-  const caches = await evaluate("caches.open('fly-ledger-v2-20261120-3').then(c=>c.keys()).then(keys=>keys.map(r=>r.url))");
+  const caches = await evaluate("caches.open('fly-ledger-v2-20261120-4').then(c=>c.keys()).then(keys=>keys.map(r=>r.url))");
   assert(caches.length >= 10);
   assert(caches.every(url => url.startsWith('http://127.0.0.1:4173/')));
   await call('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });

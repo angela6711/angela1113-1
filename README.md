@@ -2,12 +2,12 @@
 
 任何訪客開啟同一個網站網址，都可查看、新增、修改、刪除同一份帳本；不需要登入或金鑰。離線先儲存在裝置，上線後同步。這是依擁有者選擇的**公開讀寫模式**。
 
-**程式碼已提供完整串接，但實際 Google 試算表必須由 Google 帳號擁有者授權並部署 Apps Script。`cloud-config.json` 的 `url` 尚未填入時，只能本機記帳，不能跨裝置同步。**
+**程式碼已提供完整串接，但實際 Google 試算表必須由 Google 帳號擁有者授權並部署 Apps Script。指定目的地為 [這份 Google 試算表](https://docs.google.com/spreadsheets/d/17BTKjJJPznABLK0su4HlHf5UkvCicoeFbK7aFf-tu6s/edit)。`cloud-config.json` 的 `url` 尚未填入時，只能本機記帳，不能跨裝置同步。**
 
 ## 讓同一個網址連到同一份資料
 
-1. 依 [Google 建表與部署步驟](setup.html)，將 [Code.gs](google-apps-script/Code.gs) 及 [資訊清單](google-apps-script/appsscript.json) 放進自己的 Google Apps Script 專案。
-2. 執行 `setup`，授權建立新的「想飛記帳本」Google 試算表。
+1. 依 [Google 建表與部署步驟](setup.html)，從指定試算表的「擴充功能 → Apps Script」開啟專案，貼入 [Code.gs](google-apps-script/Code.gs) 及 [資訊清單](google-apps-script/appsscript.json)。執行帳號須能編輯這份試算表。
+2. 執行 `setup` 並授權，會在指定試算表新增五個「想飛_」分頁，保留原本分頁與資料，不另外建立試算表。重複執行會保留既有帳目；若首次設定時已有同名分頁，會停止，不會覆寫。
 3. 部署為網頁應用程式：以「我」執行、允許「任何人」存取。取得 `/exec` 網址。
 4. 將 `/exec` 網址填入 [cloud-config.json](cloud-config.json) 的 `url`，提交並重新發布網站。這是公開的連線設定，不需 Google 密碼或秘密金鑰。
 5. 每位訪客開啟相同網站網址即會自動連線。設定頁也可手動輸入部署網址，或複製含連線參數的共用網址供部署測試；正式使用以 `cloud-config.json` 統一設定為準。
@@ -16,7 +16,7 @@
 
 ## 資料與衝突
 
-試算表含連線設定、帳本資料、交易明細、固定支出、月結報表。「帳本資料」是來源；明細是方便閱讀的投影，直接改投影儲存格不會修改 App。金額以整數分保存，明細以元顯示。單一帳本上限 JSON 100 萬字元、每類 10,000 筆。
+指定試算表新增「想飛_連線設定」「想飛_帳本資料」「想飛_交易明細」「想飛_固定支出」「想飛_月結報表」。「想飛_帳本資料」是來源；明細是方便閱讀的投影，直接改投影儲存格不會修改 App。金額以整數分保存，明細以元顯示。單一帳本上限 JSON 100 萬字元、每類 10,000 筆。
 
 多裝置同時修改，以版本檢查與 Apps Script 鎖阻擋覆寫。App 會保留本機資料，要求明確選擇保留本機或雲端；請先下載 JSON 備份。此版不自動合併兩份帳本。公開訪客都可讀寫，沒有使用者隔離；試算表檔案本身可保持限制分享，公開的是網站 API。
 
